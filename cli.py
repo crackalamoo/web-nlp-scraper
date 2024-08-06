@@ -7,7 +7,7 @@ import pickle
 import readline
 
 from scrape import output_scrape
-from models import topic_modeling
+from models import topic_modeling, get_top_words
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -16,8 +16,8 @@ def get_parser():
     )
 
     subparsers = parser.add_subparsers(title='command', metavar='command', dest='command', help='Command to run.')
-    parser_quit = subparsers.add_parser('quit', help='Exit the CLI (can also use q)')
-    parser_urls = subparsers.add_parser('urls', help='List all URLs.')
+    subparsers.add_parser('quit', help='Exit the CLI (can also use q)')
+    subparsers.add_parser('urls', help='List URLs of all pages loaded in memory.')
 
     parser_load = subparsers.add_parser('load', help='Load data from file.')
     parser_load.add_argument('file', default='out/export.json', nargs='?', help='File to read from. Default: %(default)s')
@@ -31,7 +31,10 @@ def get_parser():
     parser_scrape.add_argument('--feed-format', default='json', choices=['json'], help='Format to output scraped data. Default: %(default)s')
 
     parser_topics = subparsers.add_parser('topics', help='Topic modeling')
-    parser_topics.add_argument('n_topics', nargs='?', type=int, default=5, help='Number of topics')
+    parser_topics.add_argument('n_topics', nargs='?', type=int, default=5, help='Number of topics. Default: %(default)s')
+
+    parser_top_words = subparsers.add_parser('top-words', help='Get the most disproportionately common words for each page (by TF-IDF).')
+    parser_top_words.add_argument('n_words', nargs='?', type=int, default=5, help='Number of words to display per topic. Default: %(default)s')
 
     return parser
 
@@ -65,6 +68,11 @@ def parse_command(cmd, parser, data_dict):
         topics = topic_modeling(data_dict, n_topics=args.n_topics)
         for i, topic in topics.iterrows():
             print(topic.sort_values(ascending=False).head(10))
+    elif args.command == 'top-words':
+        df = get_top_words(data_dict)
+        for series_name, series in df.items():
+            print(series_name)
+            print(series.sort_values(ascending=False).head(args.n_words))
 
 def main():
     parser = get_parser()
