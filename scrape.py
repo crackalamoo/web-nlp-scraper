@@ -5,6 +5,7 @@ from scrapy.http import Request, HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from bs4 import BeautifulSoup
 import urllib.parse
+import html
 import json
 import pickle
 
@@ -27,12 +28,13 @@ def html_to_text(markup, preserve_new_lines=True, remove_hidden=True, keep_langs
     'strong', 'sub', 'sup', 'svg', 'template', 'textarea', 'time', 'u', 'tt', 'var', 'video', 'wbr'])
 
     if strip_tags is None:
-        strip_tags = ['style', 'script', 'wbr']
+        strip_tags = ['style', 'script', 'wbr', 'pre']
     if keep_langs is not None and type(keep_langs) != set:
         keep_langs = set(keep_langs)
     
     markup = markup.replace('\n',' ').replace('\r\n',' ')
     markup = re.sub(r' +', ' ', markup)
+    markup = html.unescape(markup)
     soup = BeautifulSoup(markup, 'html.parser')
     
 
