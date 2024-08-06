@@ -1,12 +1,12 @@
 import scrapy
-import os
-import os.path
 import re
 from scrapy.crawler import CrawlerProcess
 from scrapy.http import Request, HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from bs4 import BeautifulSoup
 import urllib.parse
+import json
+import pickle
 
 class Page(scrapy.Item):
     url = scrapy.Field()
@@ -141,6 +141,15 @@ def output_scrape(**kwargs):
     process.crawl(BlogSpider, **kwargs)
     process.start()
     process.join()
+
+def load_scrape(file):
+    if file.endswith('.json'):
+        with open(file, 'r') as f:
+            loaded = json.load(f)
+    else:
+        with open(file, 'rb') as f:
+            loaded = pickle.load(f, encoding='utf-8')
+    return loaded
 
 if __name__ == '__main__':
     output_scrape(url='www.harysdalvi.com',

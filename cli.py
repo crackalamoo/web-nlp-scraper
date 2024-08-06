@@ -6,7 +6,7 @@ import json
 import pickle
 import readline
 
-from scrape import output_scrape
+from scrape import output_scrape, load_scrape
 from models import topic_modeling, get_top_words
 
 def get_parser():
@@ -19,8 +19,10 @@ def get_parser():
     subparsers.add_parser('quit', help='Exit the CLI (can also use q)')
     subparsers.add_parser('urls', help='List URLs of all pages loaded in memory.')
 
-    parser_load = subparsers.add_parser('load', help='Load data from file.')
+    parser_load = subparsers.add_parser('load', help='Load data from a file created by scrape.')
     parser_load.add_argument('file', default='out/export.json', nargs='?', help='File to read from. Default: %(default)s')
+    parser_compare = subparsers.add_parser('compare', help='Load data from an additional file, for comparison with the one loaded by load.')
+    parser_compare.add_argument('file', default='out/compare.json', nargs='?', help='File to read from. Default: %(default)s')
 
     parser_scrape = subparsers.add_parser('scrape', help='Scrape website data and output to disk.')
     parser_scrape.add_argument('url', help='URL to scrape. Examples: example.com or https://www.example.com')
@@ -35,24 +37,23 @@ def get_parser():
 
     parser_top_words = subparsers.add_parser('top-words', help='Get the most disproportionately common words for each page (by TF-IDF).')
     parser_top_words.add_argument('n_words', nargs='?', type=int, default=5, help='Number of words to display per topic. Default: %(default)s')
+    parser_top_words.add_argument('-c', '--compare', action='store_true', help='Compare words in the loaded website and the comparison website, rather than between documents in the loaded website.')
 
     return parser
 
 def parse_command(cmd, parser, data_dict):
     args = parser.parse_args(cmd.split())
     if args.command == 'load':
-        if args.file.endswith('.json'):
-            with open(args.file, 'r') as f:
-                loaded = json.load(f)
-        else:
-            with open(args.file, 'rb') as f:
-                loaded = pickle.load(f, encoding='utf-8')
-        data_dict.clear()
-        data_dict += loaded
+        loaded = load_scrape(args.file)
+        data_dict['page_list'] = loaded
         print(f"Successfully loaded {args.file}.")
+    elif args.command == 'compare':
+        loaded = load_scrape(args.file)
+        data_dict['compare_page_list'] = loaded
+        print(f"Successfully loaded {args.file} for comparison.")
     elif args.command == 'urls':
         urls = []
-        for page in data_dict:
+        for page in data_dict['page_list']:
             urls.append(page['url'])
         print(', '.join(urls))
     if args.command == 'scrape':
@@ -65,21 +66,25 @@ def parse_command(cmd, parser, data_dict):
             feed_format=args.feed_format
         )
     elif args.command == 'topics':
-        topics = topic_modeling(data_dict, n_topics=args.n_topics)
+        topics = topic_modeling(data_dict['page_list'], n_topics=args.n_topics)
         for i, topic in topics.iterrows():
             print(topic.sort_values(ascending=False).head(10))
     elif args.command == 'top-words':
-        df = get_top_words(data_dict)
+        df = get_top_words(data_dict['page_list'])
+        if args.compare:
+            df = get_top_words(data_dict['page_list'], compare_list=data_dict['compare_page_list'])
+        else:
+            df = get_top_words(data_dict['page_list'])
         for series_name, series in df.items():
             print(series_name)
             print(series.sort_values(ascending=False).head(args.n_words))
 
 def main():
     parser = get_parser()
-    data_dict = []
+    data_dict = {'page_list':[]}
     if os.path.isfile('out/export.json'):
         with open('out/export.json', 'r') as f:
-            data_dict = json.load(f)
+            data_dict['page_list'] = json.load(f)
         print("Successfully loaded out/export.json.")
 
     while True:
