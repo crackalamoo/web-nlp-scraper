@@ -132,6 +132,7 @@ def output_scrape(**kwargs):
                 feed_uri: {
                     'format': kwargs.get('feed_format', 'json'),
                     'uri': feed_uri,
+                    'encoding': 'utf8',
                     'overwrite': True
                 }
             }
