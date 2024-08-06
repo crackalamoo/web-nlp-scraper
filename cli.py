@@ -49,6 +49,7 @@ def get_parser():
     parser_entities = subparsers.add_parser('entities', help='Named entity recognition')
     parser_entities.add_argument('n_entities', nargs='?', type=int, default=15, help='Number of entities to display. Default: %(default)s')
     parser_entities.add_argument('--spacy-pipeline', default='en_core_web_sm', help='Spacy pipeline. Default: %(default)s')
+    parser_entities.add_argument('-c', '--compare', action='store_true', help='Display top named entities for both the loaded website and the comparison website.')
 
     return parser
 
@@ -109,8 +110,15 @@ def parse_command(cmd, parser, data_dict):
             print(diff_pairs.sort_values(ascending=False).tail())
     elif args.command == 'entities':
         entity_counts = named_entity_recognition(data_dict['page_list'], args.spacy_pipeline)
+        if args.compare:
+            print("Loaded website:")
         for entity in entity_counts.most_common(args.n_entities):
             print(f'{entity[0][0]} ({entity[0][1]}): {entity[1]}')
+        if args.compare:
+            print("\nComparison website:")
+            entity_counts = named_entity_recognition(data_dict['compare_page_list'], args.spacy_pipeline)
+            for entity in entity_counts.most_common(args.n_entities):
+                print(f'{entity[0][0]} ({entity[0][1]}): {entity[1]}')
 
 def main():
     parser = get_parser()

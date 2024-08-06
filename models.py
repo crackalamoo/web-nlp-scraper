@@ -1,9 +1,6 @@
 import numpy as np
 import pandas as pd
-import spacy
 from collections import Counter
-from sklearn.decomposition import LatentDirichletAllocation
-from sklearn.metrics.pairwise import cosine_similarity
 import string
 import re
 
@@ -38,6 +35,7 @@ def get_tf_idf(page_list, compare_list=None):
     return df
 
 def topic_modeling(page_list, compare_list=None, n_topics=5):
+    from sklearn.decomposition import LatentDirichletAllocation
     tfidf = get_tf_idf(page_list)
     if compare_list is not None:
         df2 = get_tf_idf(compare_list)
@@ -53,6 +51,7 @@ def topic_modeling(page_list, compare_list=None, n_topics=5):
     return term_topics
 
 def get_similarities(page_list, compare_list=None):
+    from sklearn.metrics.pairwise import cosine_similarity
     tfidf = get_tf_idf(page_list)
     if compare_list is not None:
         df2 = get_tf_idf(compare_list)
@@ -86,6 +85,7 @@ def get_top_words(page_list, compare_list=None):
 
 
 def named_entity_recognition(page_list, pipeline='en_core_web_sm'):
+    import spacy
     nlp = spacy.load(pipeline)
     counts = Counter()
     exclude = set(['CARDINAL', 'ORDINAL', 'PERCENT', 'MONEY', 'QUANTITY',
