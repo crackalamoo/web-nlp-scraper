@@ -34,10 +34,11 @@ def get_parser():
 
     parser_topics = subparsers.add_parser('topics', help='Topic modeling')
     parser_topics.add_argument('n_topics', nargs='?', type=int, default=5, help='Number of topics. Default: %(default)s')
+    parser_topics.add_argument('-c', '--compare', action='store_true', help='Include pages from the comparison website.')
 
     parser_top_words = subparsers.add_parser('top-words', help='Get the most disproportionately common words for each page (by TF-IDF).')
     parser_top_words.add_argument('n_words', nargs='?', type=int, default=5, help='Number of words to display per topic. Default: %(default)s')
-    parser_top_words.add_argument('-c', '--compare', action='store_true', help='Compare words in the loaded website and the comparison website, rather than between documents in the loaded website.')
+    parser_top_words.add_argument('-c', '--compare', action='store_true', help='Compare words in the loaded website and the comparison website, rather than between pages in the loaded website.')
 
     return parser
 
@@ -66,7 +67,10 @@ def parse_command(cmd, parser, data_dict):
             feed_format=args.feed_format
         )
     elif args.command == 'topics':
-        topics = topic_modeling(data_dict['page_list'], n_topics=args.n_topics)
+        if args.compare:
+            topics = topic_modeling(data_dict['page_list'], compare_list=data_dict['compare_page_list'], n_topics=args.n_topics)
+        else:
+            topics = topic_modeling(data_dict['page_list'], n_topics=args.n_topics)
         for i, topic in topics.iterrows():
             print(topic.sort_values(ascending=False).head(10))
     elif args.command == 'top-words':

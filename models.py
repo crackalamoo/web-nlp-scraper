@@ -6,7 +6,7 @@ import string
 import re
 
 def get_tf_idf(page_list, compare_list=None):
-    punct = string.punctuation + '“”‘’«»‹›‚„¡¿;،؛؟।॥•'
+    punct = string.punctuation + '“”‘’«»‹›‚„¡¿;،؛۔؟।॥•·።'
     def get_counts_df(pl):
         matrix = {}
         for page in pl:
@@ -38,8 +38,11 @@ def get_tf_idf(page_list, compare_list=None):
 
     return df
 
-def topic_modeling(page_list, n_topics=5):
+def topic_modeling(page_list, compare_list=None, n_topics=5):
     df = get_tf_idf(page_list)
+    if compare_list is not None:
+        df2 = get_tf_idf(compare_list)
+        df = pd.concat([df, df2], axis=1).fillna(0)
 
     lda = LatentDirichletAllocation(n_components=n_topics)
     term_doc = df.to_numpy().T
