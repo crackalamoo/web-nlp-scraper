@@ -3,11 +3,13 @@ import argparse
 import os
 import traceback
 import json
+import numpy as np
+import pandas as pd
 import pickle
 import readline
 
 from scrape import output_scrape, load_scrape
-from models import topic_modeling, get_top_words
+from models import topic_modeling, get_top_words, get_similarities
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -18,6 +20,7 @@ def get_parser():
     subparsers = parser.add_subparsers(title='command', metavar='command', dest='command', help='Command to run.')
     subparsers.add_parser('quit', help='Exit the CLI (can also use q)')
     subparsers.add_parser('urls', help='List URLs of all pages loaded in memory.')
+    subparsers.add_parser('titles', help='List titles of all pages loaded in memory, falling back on URL if no title.')
 
     parser_load = subparsers.add_parser('load', help='Load data from a file created by scrape.')
     parser_load.add_argument('file', default='out/export.json', nargs='?', help='File to read from. Default: %(default)s')
@@ -40,6 +43,9 @@ def get_parser():
     parser_top_words.add_argument('n_words', nargs='?', type=int, default=5, help='Number of words to display per topic. Default: %(default)s')
     parser_top_words.add_argument('-c', '--compare', action='store_true', help='Compare words in the loaded website and the comparison website, rather than between pages in the loaded website.')
 
+    parser_sims = subparsers.add_parser('sims', help='Document similarity using TF-IDF')
+    parser_sims.add_argument('-c', '--compare', action='store_true', help='Include pages from the comparison website.')
+
     return parser
 
 def parse_command(cmd, parser, data_dict):
@@ -57,6 +63,11 @@ def parse_command(cmd, parser, data_dict):
         for page in data_dict['page_list']:
             urls.append(page['url'])
         print(', '.join(urls))
+    elif args.command == 'titles':
+        titles = []
+        for page in data_dict['page_list']:
+            titles.append(page['title'] if 'title' in page else page['url'])
+        print(', '.join(titles))
     if args.command == 'scrape':
         output_scrape(
             url=args.url,
@@ -82,6 +93,16 @@ def parse_command(cmd, parser, data_dict):
         for series_name, series in df.items():
             print(series_name)
             print(series.sort_values(ascending=False).head(args.n_words))
+    elif args.command == 'sims':
+        if args.compare:
+            sims, sims_list, diff_pairs = get_similarities(data_dict['page_list'], compare_list=data_dict['compare_page_list'])
+        else:
+            sims, sims_list = get_similarities(data_dict['page_list'])
+        print(sims_list.sort_values(ascending=False).head())
+        print(sims_list.sort_values(ascending=False).tail())
+        if args.compare:
+            print(diff_pairs.sort_values(ascending=False).head())
+            print(diff_pairs.sort_values(ascending=False).tail())
 
 def main():
     parser = get_parser()
