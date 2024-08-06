@@ -4,6 +4,9 @@ import os
 import traceback
 import json
 import pickle
+import readline
+
+from scrape import output_scrape
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -13,8 +16,19 @@ def get_parser():
 
     subparsers = parser.add_subparsers(title='command', metavar='command', dest='command', help='Command to run.')
     parser_urls = subparsers.add_parser('urls', help='list all urls')
+    parser_quit = subparsers.add_parser('quit', help='exit the CLI (can also use q)')
+
     parser_load = subparsers.add_parser('load', help='load data from file')
-    parser_load.add_argument('-f', '--file', default='out/export.pkl', help='file to read from (default: %(default)s)')
+    parser_load.add_argument('file', default='out/export.json', nargs='?', help='File to read from. Default: %(default)s')
+
+    parser_scrape = subparsers.add_parser('scrape', help='scrape and output website data')
+    parser_scrape.add_argument('url', help='URL to scrape. Examples: example.com or https://www.example.com')
+    parser_scrape.add_argument('--allow', nargs='*', help='List of RegEx expressions for allowed sub-URLs. Example: --allow sub\/* to allow all https://www.example.com/sub/*')
+    parser_scrape.add_argument('--deny', nargs='*', help='List of RegEx expressions for disallowed sub-URLs. Example: --deny sub\/* to disallow all https://www.example.com/sub/*')
+    parser_scrape.add_argument('--keep-langs', nargs='*', help='For a multilingual site, only tags with no lang or the given languages will be scraped. Example: --keep-langs en es will keep all English- and Spanish-language content, and ignore elements with any other lang tag. Default: use content in all languages.')
+    parser_scrape.add_argument('--feed-uri', default='out/export.json', help='File to output scraped data. Default: %(default)s')
+    parser_scrape.add_argument('--feed-format', default='json', choices=['json'], help='Format to output scraped data. Default: %(default)s')
+
     return parser
 
 def parse_command(cmd, parser, data_dict):
@@ -34,6 +48,15 @@ def parse_command(cmd, parser, data_dict):
         for page in data_dict:
             urls.append(page['url'])
         print(', '.join(urls))
+    elif args.command == 'scrape':
+        output_scrape(
+            url=args.url,
+            allow=args.allow,
+            deny=args.deny,
+            keep_langs=args.keep_langs,
+            feed_uri=args.feed_uri,
+            feed_format=args.feed_format
+        )
 
 def main():
     parser = get_parser()
@@ -49,7 +72,12 @@ def main():
             parse_command(cmd, parser, data_dict)
         except Exception:
             sys.stderr.write(traceback.format_exc())
-        except SystemExit:
+        except SystemExit: # for argparse
+            pass
+        try:
+            if cmd.split()[0] == 'quit' or cmd.split()[0] == 'q':
+                sys.exit(0)
+        except IndexError:
             pass
 
 if __name__ == '__main__':

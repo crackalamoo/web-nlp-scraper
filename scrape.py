@@ -5,7 +5,6 @@ import re
 from scrapy.crawler import CrawlerProcess
 from scrapy.http import Request, HtmlResponse
 from scrapy.linkextractors import LinkExtractor
-from scrapy.utils.project import get_project_settings
 from bs4 import BeautifulSoup
 import urllib.parse
 
@@ -82,14 +81,16 @@ class BlogSpider(scrapy.Spider):
 
         hostname = re.sub(r'^www\.', '', urllib.parse.urlsplit(url).hostname)
 
-        allow = kwargs.get('allow', [])
-        deny = kwargs.get('deny', [])
-        for i in range(len(deny)):
-            if not deny[i].startswith(self.url):
-                deny[i] = f'https?:\/\/(www\.)?{hostname}\/' + deny[i]
-        for i in range(len(allow)):
-            if not allow[i].startswith(self.url):
-                allow[i] = f'https?:\/\/(www\.)?{hostname}\/' + allow[i]
+        allow = kwargs.get('allow')
+        deny = kwargs.get('deny')
+        if deny is not None:
+            for i in range(len(deny)):
+                if not deny[i].startswith(self.url):
+                    deny[i] = f'https?:\/\/(www\.)?{hostname}\/' + deny[i]
+        if allow is not None:
+            for i in range(len(allow)):
+                if not allow[i].startswith(self.url):
+                    allow[i] = f'https?:\/\/(www\.)?{hostname}\/' + allow[i]
         
         self.link_extractor = LinkExtractor(allow_domains=[hostname], allow=allow, deny=deny)
 
@@ -125,19 +126,21 @@ class BlogSpider(scrapy.Spider):
 def output_scrape(**kwargs):
     feed_uri = kwargs.get('feed_uri', 'out/export.json')
 
-    if os.path.isfile(feed_uri):
-        os.remove(feed_uri)
-
     process = CrawlerProcess(
         settings={
-            'FEED_FORMAT': kwargs.get('feed_format', 'json'),
-            'FEED_URI': feed_uri,
-            'FEED_EXPORT_ENCODING': 'utf-8'
+            'FEEDS': {
+                feed_uri: {
+                    'format': kwargs.get('feed_format', 'json'),
+                    'uri': feed_uri,
+                    'overwrite': True
+                }
+            }
         }
     )
 
     process.crawl(BlogSpider, **kwargs)
     process.start()
+    process.join()
 
 if __name__ == '__main__':
     output_scrape(url='www.harysdalvi.com',
