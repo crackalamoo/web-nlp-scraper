@@ -7,6 +7,7 @@ from scrapy.http import Request, HtmlResponse
 from scrapy.linkextractors import LinkExtractor
 from scrapy.utils.project import get_project_settings
 from bs4 import BeautifulSoup
+import urllib.parse
 
 class Page(scrapy.Item):
     url = scrapy.Field()
@@ -20,11 +21,11 @@ def html_to_text(markup, preserve_new_lines=True, remove_hidden=True, keep_langs
     """
     Based on https://stackoverflow.com/questions/30337528/make-beautifulsoup-handle-line-breaks-as-a-browser-would (Rich - enzedonline)
     """
-    NON_BREAKING_ELEMENTS = ['a', 'abbr', 'acronym', 'audio', 'b', 'bdi', 'bdo', 'big', 'button', 
+    NON_BREAKING_ELEMENTS = set(['a', 'abbr', 'acronym', 'audio', 'b', 'bdi', 'bdo', 'big', 'button', 
     'canvas', 'cite', 'code', 'data', 'datalist', 'del', 'dfn', 'em', 'embed', 'i', 'iframe', 
     'img', 'input', 'ins', 'kbd', 'label', 'map', 'mark', 'meter', 'noscript', 'object', 'output', 
     'picture', 'progress', 'q', 'ruby', 's', 'samp', 'script', 'select', 'slot', 'small', 'span', 
-    'strong', 'sub', 'sup', 'svg', 'template', 'textarea', 'time', 'u', 'tt', 'var', 'video', 'wbr']
+    'strong', 'sub', 'sup', 'svg', 'template', 'textarea', 'time', 'u', 'tt', 'var', 'video', 'wbr'])
 
     if strip_tags is None:
         strip_tags = ['style', 'script', 'wbr']
@@ -32,8 +33,8 @@ def html_to_text(markup, preserve_new_lines=True, remove_hidden=True, keep_langs
         keep_langs = set(keep_langs)
     
     markup = markup.replace('\n',' ').replace('\r\n',' ')
-    markup = re.sub(' +', ' ', markup)
-    soup = BeautifulSoup(markup, "html.parser")
+    markup = re.sub(r' +', ' ', markup)
+    soup = BeautifulSoup(markup, 'html.parser')
     
 
     for element in soup(strip_tags):
@@ -61,23 +62,41 @@ def html_to_text(markup, preserve_new_lines=True, remove_hidden=True, keep_langs
         for element in soup.find_all():
             if element.name not in NON_BREAKING_ELEMENTS:
                 element.append('\n') if element.name == 'br' else element.append('\n\n')
-    text = soup.get_text(" ").strip()
-    text = re.sub('\n +', '\n', text)
-    text = re.sub(' +\n', '\n', text)
-    text = re.sub(' +', ' ', text)
-    text = re.sub('\n\n+','\n\n', text)
+    text = soup.get_text(' ').strip()
+    text = re.sub(r'\n +', '\n', text)
+    text = re.sub(r' +\n', '\n', text)
+    text = re.sub(r' +', ' ', text)
+    text = re.sub(r'\n\n+', '\n\n', text)
     return text
 
 class BlogSpider(scrapy.Spider):
     name = 'blog-spider'
-    start_urls = ['https://www.harysdalvi.com']
 
     def __init__(self, **kwargs):
         super(BlogSpider, self).__init__(**kwargs)
-        deny = ['sub\/*', 'calcalc', 'names']
+
+        url = kwargs.get('url') or kwargs.get('domain') or 'https://www.harysdalvi.com'
+        if not url.startswith('http://') and not url.startswith('https://'):
+            url = f'http://{url}'
+        self.url = url
+
+        hostname = re.sub(r'^www\.', '', urllib.parse.urlsplit(url).hostname)
+
+        allow = kwargs.get('allow', [])
+        deny = kwargs.get('deny', [])
         for i in range(len(deny)):
-            deny[i] = 'https?:\/\/(www.)?harysdalvi.com\/' + deny[i]
-        self.link_extractor = LinkExtractor(allow_domains=['harysdalvi.com'], deny=deny)
+            if not deny[i].startswith(self.url):
+                deny[i] = f'https?:\/\/(www\.)?{hostname}\/' + deny[i]
+        for i in range(len(allow)):
+            if not allow[i].startswith(self.url):
+                allow[i] = f'https?:\/\/(www\.)?{hostname}\/' + allow[i]
+        
+        self.link_extractor = LinkExtractor(allow_domains=[hostname], allow=allow, deny=deny)
+
+        self.keep_langs = kwargs.get('keep_langs')
+
+    def start_requests(self):
+        return [Request(self.url, callback=self.parse, dont_filter=True)]
 
     def parse(self, response):
         page = self._get_item(response)
@@ -88,10 +107,10 @@ class BlogSpider(scrapy.Spider):
     def _get_item(self, response):
         item = Page(
             url=response.url,
-            body=html_to_text(response.text, keep_langs=['en'])
+            body=html_to_text(response.text, keep_langs=self.keep_langs)
         )
         if isinstance(response, HtmlResponse):
-            title = response.xpath("//title/text()").extract()
+            title = response.xpath('//title/text()').extract()
             if title:
                 item['title'] = title[0]
         return item
@@ -103,18 +122,25 @@ class BlogSpider(scrapy.Spider):
             r.extend(Request(x.url, callback=self.parse) for x in links)
         return r
 
-if __name__ == '__main__':
-    settings = get_project_settings()
+def output_scrape(**kwargs):
+    feed_uri = kwargs.get('uri', 'out/export.json')
 
-    if os.path.isfile("out/export.json"):
-        os.remove("out/export.json")
+    if os.path.isfile(feed_uri):
+        os.remove(feed_uri)
 
     process = CrawlerProcess(
         settings={
-            "FEED_FORMAT": "json",
-            "FEED_URI": "out/export.json"
+            "FEED_FORMAT": kwargs.get('feed_format', 'json'),
+            "FEED_URI": feed_uri
         }
     )
 
-    process.crawl(BlogSpider)
+    process.crawl(BlogSpider, **kwargs)
     process.start()
+
+if __name__ == '__main__':
+    output_scrape(feed_uri='out/export.json',
+                  url='www.harysdalvi.com',
+                  allow=[r'blog\/*'],
+                  deny=[r'sub\/*', 'calcalc', 'names', 'ahsgrades'],
+                  keep_langs=['en'])
