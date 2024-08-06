@@ -123,15 +123,16 @@ class BlogSpider(scrapy.Spider):
         return r
 
 def output_scrape(**kwargs):
-    feed_uri = kwargs.get('uri', 'out/export.json')
+    feed_uri = kwargs.get('feed_uri', 'out/export.json')
 
     if os.path.isfile(feed_uri):
         os.remove(feed_uri)
 
     process = CrawlerProcess(
         settings={
-            "FEED_FORMAT": kwargs.get('feed_format', 'json'),
-            "FEED_URI": feed_uri
+            'FEED_FORMAT': kwargs.get('feed_format', 'json'),
+            'FEED_URI': feed_uri,
+            'FEED_EXPORT_ENCODING': 'utf-8'
         }
     )
 
@@ -139,8 +140,7 @@ def output_scrape(**kwargs):
     process.start()
 
 if __name__ == '__main__':
-    output_scrape(feed_uri='out/export.json',
-                  url='www.harysdalvi.com',
+    output_scrape(url='www.harysdalvi.com',
                   allow=[r'blog\/*'],
                   deny=[r'sub\/*', 'calcalc', 'names', 'ahsgrades'],
                   keep_langs=['en'])
