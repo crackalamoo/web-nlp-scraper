@@ -9,6 +9,7 @@ def topic_modeling(page_list, compare_list=None, n_topics=5):
     if compare_list is not None:
         df2 = get_tf_idf(compare_list)
         tfidf = pd.concat([tfidf, df2], axis=1).fillna(0)
+        tfidf.columns = ['Loaded', 'Comparison']
 
     lda = LatentDirichletAllocation(n_components=n_topics)
     term_doc = tfidf.to_numpy().T
@@ -26,6 +27,7 @@ def get_similarities(page_list, compare_list=None):
         df2 = get_tf_idf(compare_list)
         compare_cutoff = len(tfidf.columns)
         tfidf = pd.concat([tfidf, df2], axis=1).fillna(0)
+        tfidf.columns = ['Loaded', 'Comparison']
     sims = cosine_similarity(tfidf.to_numpy().T)
     sims = pd.DataFrame(sims, index=tfidf.columns, columns=tfidf.columns)
 
@@ -74,6 +76,7 @@ def stopwords_tf_idf(page_list, compare_list=None, remove_stop=True, no_num_stop
         counts_df = counts_df.sum(axis=1)
         df2 = get_counts_df(compare_list).sum(axis=1)
         counts_df = pd.concat([counts_df, df2], axis=1).fillna(0)
+        counts_df.columns = ['Loaded', 'Comparison']
 
     nlp = spacy.load(pipeline)
     to_delete = []
