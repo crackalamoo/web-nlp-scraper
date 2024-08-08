@@ -9,7 +9,7 @@ import pickle
 import readline
 
 from scrape import output_scrape, load_scrape
-from models import topic_modeling, get_top_words, get_similarities, named_entity_recognition, stopwords_tf_idf
+from models import topic_modeling, get_top_words, get_similarities, named_entity_recognition, stopwords_tf_idf, bert_classifier
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -56,6 +56,7 @@ def get_parser():
     parser_style.add_argument('-c', '--compare', action='store_true', help='Display top named entities for both the loaded website and the comparison website.')
     parser_style.add_argument('--spacy-pipeline', default='en_core_web_sm', help='Spacy pipeline. Default: %(default)s')
 
+    parser_classifier = subparsers.add_parser('classifier', help='Train a BERT classifier between the loaded and comparison websites')
 
     return parser
 
@@ -132,6 +133,10 @@ def parse_command(cmd, parser, data_dict):
         for series_name, series in df.items():
             print(series_name)
             print(series.sort_values(ascending=False).head(args.n_words))
+    elif args.command == 'classifier':
+        if 'compare_page_list' not in data_dict:
+            print("Must load another website for comparison")
+        res = bert_classifier(data_dict['page_list'], data_dict['compare_page_list'])
 
 def main():
     parser = get_parser()

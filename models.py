@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from collections import Counter
-from utils import get_tf_idf, get_counts_df
+from utils import get_tf_idf, get_counts_df, split_sentences
 
 def topic_modeling(page_list, compare_list=None, n_topics=5):
     from sklearn.decomposition import LatentDirichletAllocation
@@ -98,3 +98,31 @@ def stopwords_tf_idf(page_list, compare_list=None, remove_stop=True, no_num_stop
     counts_df = counts_df.drop(to_delete, axis=0)
     tf_idf = get_tf_idf(page_list, counts_df=counts_df)
     return tf_idf
+
+def bert_classifier(page_list, compare_list):
+    from transformers import BertTokenizer, BertModel
+    import torch
+    from torch.utils.data import Dataset
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    model = BertModel.from_pretrained('bert-base-uncased')
+
+    class WebsiteDataset(Dataset):
+        def __init__(self, pl, cl):
+            page_snt = split_sentences(pl)
+            compare_snt = split_sentences(cl)
+            min_len = min(len(page_snt), len(compare_snt))
+            page_snt = page_snt[:min_len]
+            compare_snt = compare_snt[:min_len]
+            self.labels = [0] * len(page_snt)
+            self.labels += [1] * len(compare_snt)
+            self.sentences = page_snt + compare_snt
+        
+        def __len__(self):
+            return len(self.sentences)
+
+        def __getitem__(self, idx):
+            tokens = tokenizer(self.sentences[idx], return_tensors='pt')
+            label = torch.tensor(self.labels[idx], dtype=torch.int8)
+            return tokens, label
+    
+    dataset = WebsiteDataset(page_list, compare_list)
