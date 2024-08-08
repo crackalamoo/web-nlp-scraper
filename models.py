@@ -28,7 +28,6 @@ def get_similarities(page_list, compare_list=None):
         df2 = get_tf_idf(compare_list)
         compare_cutoff = len(tfidf.columns)
         tfidf = pd.concat([tfidf, df2], axis=1).fillna(0)
-        tfidf.columns = ['Loaded', 'Comparison']
     sims = cosine_similarity(tfidf.to_numpy().T)
     sims = pd.DataFrame(sims, index=tfidf.columns, columns=tfidf.columns)
 

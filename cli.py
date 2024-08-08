@@ -109,10 +109,14 @@ def parse_command(cmd, parser, data_dict):
             sims, sims_list, diff_pairs = get_similarities(data_dict['page_list'], compare_list=data_dict['compare_page_list'])
         else:
             sims, sims_list = get_similarities(data_dict['page_list'])
+        print("*** Most similar pages ***")
         print(sims_list.sort_values(ascending=False).head())
+        print("*** Least similar pages ***")
         print(sims_list.sort_values(ascending=False).tail())
         if args.compare:
+            print("*** Most similar pages, between websites ***")
             print(diff_pairs.sort_values(ascending=False).head())
+            print("*** Least similar pages, between websites ***")
             print(diff_pairs.sort_values(ascending=False).tail())
     elif args.command == 'entities':
         entity_counts = named_entity_recognition(data_dict['page_list'], args.spacy_pipeline)
@@ -148,7 +152,6 @@ def main():
         print("Successfully loaded out/export.json.")
 
     while True:
-        # scrape harysdalvi.com --deny sub\/* calcalc ahsgrades names --keep-langs en
         try:
             cmd = input('>>> ')
             parse_command(cmd, parser, data_dict)

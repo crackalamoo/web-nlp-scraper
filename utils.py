@@ -48,7 +48,6 @@ def split_sentences(page_list, max_length=250):
             while len(sentences[i]) > max_length and sentences[i].rfind(' ') != -1:
                 sentences[i] = sentences[i][:sentences[i].rfind(' ')]
             sentences[i] = sentences[i][:max_length]
-            # print(prev, '->', sentences[i])
         sentences[i] = sentences[i].strip()
         if len(sentences[i]) == 0:
             sentences.pop(i)
