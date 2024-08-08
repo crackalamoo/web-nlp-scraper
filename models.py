@@ -157,8 +157,9 @@ def bert_classifier(page_list, compare_list):
             src_batch.append(src_sample[0, :])
             label_batch.append(label_sample)
         src = nn.utils.rnn.pad_sequence(src_batch)
-        labels = torch.tensor(label_batch)
-        return src, labels
+        mask = (src != 0)
+        labels = torch.tensor(label_batch, device=device)
+        return src, mask, labels
     train_set, val_set = random_split(dataset, [0.8, 0.2])
     train_loader = DataLoader(train_set, batch_size=64, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_set, batch_size=64, collate_fn=collate_fn)
@@ -172,8 +173,41 @@ def bert_classifier(page_list, compare_list):
     n_epochs = 5
     for epoch in range(n_epochs):
         print(f"Epoch {epoch+1}")
+
+        train_losses = []
         for batch in tqdm(train_loader):
-            inputs, label = batch
-            bert_state = bert_model.forward(inputs).last_hidden_state
+            inputs, mask, label = batch
+
+            optimizer.zero_grad()
+
+            bert_state = bert_model(inputs, attention_mask=mask).last_hidden_state
             bert_state = bert_state[-1, :, :] # get last token
             y_pred = classifier(bert_state)[:, 0] # shape [batch_size]
+            y_true = label.to(dtype=y_pred.dtype)
+            loss = loss_fn(y_pred, y_true)
+            loss.backward()
+
+            optimizer.step()
+
+            train_losses.append(loss.item())
+        print("train loss:", np.mean(train_losses))
+
+        with torch.no_grad():
+            val_losses = []
+            val_accs = []
+
+            for batch in tqdm(val_loader):
+                inputs, mask, label = batch
+                bert_state = bert_model(inputs, attention_mask=mask).last_hidden_state
+                bert_state = bert_state[-1, :, :] # get last token
+                y_pred = classifier(bert_state)[:, 0] # shape [batch_size]
+                y_true = label.to(dtype=y_pred.dtype)
+                loss = loss_fn(y_pred, y_true)
+
+                y_pred_r = torch.round(sigmoid(y_pred))
+                acc = torch.sum(y_pred_r == y_true) / val_loader.batch_size
+
+                val_losses.append(loss.item())
+                val_accs.append(acc.item())
+            print("val loss:", np.mean(val_losses))
+            print("val acc:", np.mean(val_accs))
