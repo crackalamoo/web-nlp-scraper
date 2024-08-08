@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from collections import Counter
-from utils import get_tf_idf
+from utils import get_tf_idf, get_counts_df
 
 def topic_modeling(page_list, compare_list=None, n_topics=5):
     from sklearn.decomposition import LatentDirichletAllocation
@@ -66,3 +66,32 @@ def named_entity_recognition(page_list, pipeline='en_core_web_sm'):
                 entities.append((word.text, word.label_))
         counts += Counter(entities)
     return counts
+
+def stopwords_tf_idf(page_list, compare_list=None, remove_stop=True, no_num_stop=True, pipeline='en_core_web_sm'):
+    import spacy
+    counts_df = get_counts_df(page_list)
+    if compare_list is not None:
+        counts_df = counts_df.sum(axis=1)
+        df2 = get_counts_df(compare_list).sum(axis=1)
+        counts_df = pd.concat([counts_df, df2], axis=1).fillna(0)
+
+    nlp = spacy.load(pipeline)
+    to_delete = []
+    for word in counts_df.index:
+        word_doc = nlp(word)
+        is_stop = False
+        if len(word_doc) == 1:
+            is_stop = word_doc[0].is_stop
+        if no_num_stop:
+            # do not consider numerals to be stopwords
+            is_stop = is_stop and not word_doc[0].like_num
+            is_stop = is_stop and not any(c.isdigit() for c in word)
+        
+        if remove_stop and is_stop:
+            to_delete.append(word)
+        elif not remove_stop and not is_stop:
+            to_delete.append(word)
+    
+    counts_df = counts_df.drop(to_delete, axis=0)
+    tf_idf = get_tf_idf(page_list, counts_df=counts_df)
+    return tf_idf

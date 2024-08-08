@@ -9,7 +9,7 @@ import pickle
 import readline
 
 from scrape import output_scrape, load_scrape
-from models import topic_modeling, get_top_words, get_similarities, named_entity_recognition
+from models import topic_modeling, get_top_words, get_similarities, named_entity_recognition, stopwords_tf_idf
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -48,8 +48,14 @@ def get_parser():
 
     parser_entities = subparsers.add_parser('entities', help='Named entity recognition')
     parser_entities.add_argument('n_entities', nargs='?', type=int, default=15, help='Number of entities to display. Default: %(default)s')
-    parser_entities.add_argument('--spacy-pipeline', default='en_core_web_sm', help='Spacy pipeline. Default: %(default)s')
     parser_entities.add_argument('-c', '--compare', action='store_true', help='Display top named entities for both the loaded website and the comparison website.')
+    parser_entities.add_argument('--spacy-pipeline', default='en_core_web_sm', help='Spacy pipeline. Default: %(default)s')
+
+    parser_style = subparsers.add_parser('style', help='Style analysis: get top stopwords, indicating disproportionately used stylistic words')
+    parser_style.add_argument('n_words', nargs='?', type=int, default=5, help='Number of words to display per topic. Default: %(default)s')
+    parser_style.add_argument('-c', '--compare', action='store_true', help='Display top named entities for both the loaded website and the comparison website.')
+    parser_style.add_argument('--spacy-pipeline', default='en_core_web_sm', help='Spacy pipeline. Default: %(default)s')
+
 
     return parser
 
@@ -90,7 +96,6 @@ def parse_command(cmd, parser, data_dict):
         for i, topic in topics.iterrows():
             print(topic.sort_values(ascending=False).head(10))
     elif args.command == 'top-words':
-        df = get_top_words(data_dict['page_list'])
         if args.compare:
             df = get_top_words(data_dict['page_list'], compare_list=data_dict['compare_page_list'])
         else:
@@ -119,6 +124,14 @@ def parse_command(cmd, parser, data_dict):
             entity_counts = named_entity_recognition(data_dict['compare_page_list'], args.spacy_pipeline)
             for entity in entity_counts.most_common(args.n_entities):
                 print(f'{entity[0][0]} ({entity[0][1]}): {entity[1]}')
+    elif args.command == 'style':
+        if args.compare:
+            df = stopwords_tf_idf(data_dict['page_list'], compare_list=data_dict['compare_page_list'], remove_stop=False, pipeline=args.spacy_pipeline)
+        else:
+            df = stopwords_tf_idf(data_dict['page_list'], remove_stop=False, pipeline=args.spacy_pipeline)
+        for series_name, series in df.items():
+            print(series_name)
+            print(series.sort_values(ascending=False).head(args.n_words))
 
 def main():
     parser = get_parser()
