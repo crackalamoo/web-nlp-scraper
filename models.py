@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from collections import Counter
 from utils import get_tf_idf, get_counts_df, split_sentences
+from tqdm import tqdm
 
 def topic_modeling(page_list, compare_list=None, n_topics=5):
     from sklearn.decomposition import LatentDirichletAllocation
@@ -102,9 +103,19 @@ def stopwords_tf_idf(page_list, compare_list=None, remove_stop=True, no_num_stop
 def bert_classifier(page_list, compare_list):
     from transformers import BertTokenizer, BertModel
     import torch
-    from torch.utils.data import Dataset
+    import torch.nn as nn
+    from torch.nn.functional import sigmoid
+    from torch.utils.data import Dataset, DataLoader, random_split
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-    model = BertModel.from_pretrained('bert-base-uncased')
+    bert_model = BertModel.from_pretrained('bert-base-uncased')
+
+    device = 'cpu'
+    if torch.cuda.is_available():
+        device = 'cuda'
+    elif torch.backends.mps.is_available():
+        device = 'mps'
+    device = torch.device(device)
+    bert_model = bert_model.to(device)
 
     class WebsiteDataset(Dataset):
         def __init__(self, pl, cl):
@@ -121,8 +132,48 @@ def bert_classifier(page_list, compare_list):
             return len(self.sentences)
 
         def __getitem__(self, idx):
-            tokens = tokenizer(self.sentences[idx], return_tensors='pt')
-            label = torch.tensor(self.labels[idx], dtype=torch.int8)
+            tokens = tokenizer(self.sentences[idx], return_tensors='pt').input_ids.to(device)
+            label = torch.tensor(self.labels[idx], dtype=torch.int8, device=device)
             return tokens, label
     
+    class ClassifierModel(nn.Module):
+        def __init__(self):
+            super(ClassifierModel, self).__init__()
+            self.linear = nn.Linear(768, 1)
+        
+        def forward(self, x):
+            x = self.linear(x)
+            return x
+
+    classifier = ClassifierModel()
+    classifier = classifier.to(device)
+
     dataset = WebsiteDataset(page_list, compare_list)
+
+    def collate_fn(batch):
+        src_batch = []
+        label_batch = []
+        for src_sample, label_sample in batch:
+            src_batch.append(src_sample[0, :])
+            label_batch.append(label_sample)
+        src = nn.utils.rnn.pad_sequence(src_batch)
+        labels = torch.tensor(label_batch)
+        return src, labels
+    train_set, val_set = random_split(dataset, [0.8, 0.2])
+    train_loader = DataLoader(train_set, batch_size=64, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_set, batch_size=64, collate_fn=collate_fn)
+
+    for param in bert_model.parameters():
+        param.requires_grad = False
+    
+    loss_fn = nn.BCEWithLogitsLoss()
+    optimizer = torch.optim.Adam(classifier.parameters(), lr=1e-2)
+
+    n_epochs = 5
+    for epoch in range(n_epochs):
+        print(f"Epoch {epoch+1}")
+        for batch in tqdm(train_loader):
+            inputs, label = batch
+            bert_state = bert_model.forward(inputs).last_hidden_state
+            bert_state = bert_state[-1, :, :] # get last token
+            y_pred = classifier(bert_state)[:, 0] # shape [batch_size]

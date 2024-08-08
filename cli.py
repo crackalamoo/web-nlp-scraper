@@ -136,6 +136,7 @@ def parse_command(cmd, parser, data_dict):
     elif args.command == 'classifier':
         if 'compare_page_list' not in data_dict:
             print("Must load another website for comparison")
+            return
         res = bert_classifier(data_dict['page_list'], data_dict['compare_page_list'])
 
 def main():
