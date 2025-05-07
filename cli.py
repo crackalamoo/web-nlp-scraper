@@ -10,6 +10,7 @@ import readline
 
 from scrape import output_scrape, load_scrape
 from models import topic_modeling, get_top_words, get_similarities, named_entity_recognition, stopwords_tf_idf, bert_classifier
+from markdown import write_md
 
 def get_parser():
     parser = argparse.ArgumentParser(
@@ -57,6 +58,11 @@ def get_parser():
     parser_style.add_argument('--spacy-pipeline', default='en_core_web_sm', help='Spacy pipeline. Default: %(default)s')
 
     parser_classifier = subparsers.add_parser('classifier', help='Train a BERT classifier between the loaded and comparison websites')
+
+    parser_md = subparsers.add_parser('markdown', help='Export scraped data to a Markdown file')
+    parser_md.add_argument('--deny', nargs='*', help='List of page titles to exclude from the Markdown file, comma-separated')
+    parser_md.add_argument('--feed-uri', default='out/out.md', help='Markdown file location to export to. Default: %(default)s')
+    parser_md.add_argument('--scrape-json', default='out/export.json', help='Exported web scrape location to read from. Default: %(default)s')
 
     return parser
 
@@ -142,6 +148,12 @@ def parse_command(cmd, parser, data_dict):
             print("Must load another website for comparison")
             return
         res = bert_classifier(data_dict['page_list'], data_dict['compare_page_list'])
+    elif args.command == 'markdown':
+        if args.deny is None:
+            deny = set()
+        else:
+            deny = ' '.join(args.deny).split(',')
+        write_md(scrape_json=args.scrape_json, out=args.feed_uri, skip_titles=deny)
 
 def main():
     parser = get_parser()

@@ -6,6 +6,7 @@ Ideal for understanding the language trends of a blog, or comparing two blogs.
 Features:
 
 * **Scraping.** Scrape and clean pages on a website using `scrapy`.
+* **Markdown.** Export an entire website to a Markdown file.
 * **Comparison.** Run a variety of NLP algorithms to compare differences in style and subject matter between two websites.
 * **Topic modeling.** Use linear discriminant analysis to determine the most common topics discussed on a website.
 * **Document similarity.** Use term frequency-inverse document frequency (TF-IDF) to determine the most and least similar pages within a website or between two websites.
